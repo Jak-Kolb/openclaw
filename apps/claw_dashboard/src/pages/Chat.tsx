@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useGateway } from '../hooks/useGateway';
+import { useOpenClawWebSocket } from '../hooks/useOpenClawWebSocket';
 import { useChat } from '../contexts/ChatContext';
 import {
   PaperAirplaneIcon,
@@ -20,7 +20,7 @@ interface Message {
 }
 
 const Chat = () => {
-  const { status } = useGateway();
+  const { isConnected, sendMessage, messages: wsMessages, error } = useOpenClawWebSocket();
   const [searchParams, setSearchParams] = useSearchParams();
   const agentId = searchParams.get('agent') || 'main';
   const { agentIds, messagesByAgent, addMessage, ensureAgentTab } = useChat();
@@ -30,6 +30,34 @@ const Chat = () => {
   useEffect(() => {
     ensureAgentTab(agentId);
   }, [agentId, ensureAgentTab]);
+
+  // Sync WebSocket messages with chat context
+  useEffect(() => {
+    // Filter WebSocket messages for the current agent
+    const agentMessages = wsMessages.filter(msg => 
+      msg.sessionId === agentId || (agentId === 'main' && !msg.sessionId)
+    );
+    
+    // Add any new messages from WebSocket to chat context
+    agentMessages.forEach(wsMessage => {
+      // Check if this message already exists in chat context
+      const existingMessage = messagesByAgent[agentId]?.find(
+        msg => msg.id === wsMessage.id || msg.text === wsMessage.text
+      );
+      
+      if (!existingMessage && wsMessage.text) {
+        addMessage(agentId, {
+          id: wsMessage.id || Date.now().toString(),
+          text: wsMessage.text,
+          sender: wsMessage.sender || 'assistant',
+          timestamp: wsMessage.timestamp instanceof Date 
+            ? wsMessage.timestamp.toISOString() 
+            : wsMessage.timestamp || new Date().toISOString(),
+        });
+      }
+    });
+  }, [wsMessages, agentId, messagesByAgent, addMessage]);
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -66,39 +94,16 @@ const Chat = () => {
     setIsLoading(true);
 
     try {
-      if (!window.electronAPI?.agentRun) {
-        throw new Error('Agent API not available');
-      }
-
-      const res = await window.electronAPI.agentRun({
-        agentId,
-        message: userMessage.text,
-        thinking: 'low',
-      });
-
-      if (!res.success) {
-        throw new Error(res.error || 'Agent request failed');
-      }
-
-      // Try to parse a text response from the CLI result
-      const outputText =
-        res.result?.payloads?.[0]?.text ||
-        res.result?.message ||
-        res.result?.text ||
-        res.result?.output ||
-        (typeof res.result === 'string' ? res.result : JSON.stringify(res.result));
-
-      const response: Message = {
-        id: (Date.now() + 1).toString(),
-        text: outputText || 'No response text returned.',
-        sender: 'assistant',
-        timestamp: new Date().toISOString(),
-      };
-      addMessage(agentId, response);
+      // Use WebSocket to send message instead of Electron API
+      const messageId = await sendMessage(input.trim(), agentId);
+      
+      // Note: The response will come via WebSocket message event
+      // and will be added to messages automatically
+      console.log('Message sent with ID:', messageId);
     } catch (err: any) {
       const response: Message = {
         id: (Date.now() + 1).toString(),
-        text: `Error: ${err.message || 'Failed to contact agent'}`,
+        text: `Error: ${err.message || 'Failed to send message via WebSocket'}`,
         sender: 'assistant',
         timestamp: new Date().toISOString(),
       };
@@ -139,19 +144,19 @@ const Chat = () => {
           <div className="flex items-center space-x-2">
             <div className={clsx(
               'flex items-center px-3 py-1 rounded-full text-sm font-medium',
-              status.running 
+              isConnected 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-red-100 text-red-800'
             )}>
-              {status.running ? (
+              {isConnected ? (
                 <>
                   <CheckCircleIcon className="w-4 h-4 mr-1" />
-                  Gateway Connected
+                  WebSocket Connected
                 </>
               ) : (
                 <>
                   <ExclamationTriangleIcon className="w-4 h-4 mr-1" />
-                  Gateway Offline
+                  WebSocket Offline
                 </>
               )}
             </div>
@@ -283,14 +288,14 @@ const Chat = () => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder={status.running 
+                  placeholder={isConnected 
                     ? "Type your message here... (Press Enter to send)" 
-                    : "Gateway is offline. Start the gateway to chat..."
+                    : "WebSocket is offline. Connect to gateway to chat..."
                   }
-                  disabled={!status.running || isLoading}
+                  disabled={!isConnected || isLoading}
                   className={clsx(
                     'input pr-12',
-                    (!status.running || isLoading) && 'opacity-50 cursor-not-allowed'
+                    (!isConnected || isLoading) && 'opacity-50 cursor-not-allowed'
                   )}
                 />
                 {isLoading && (
@@ -301,22 +306,22 @@ const Chat = () => {
               </div>
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || isLoading || !status.running}
+                disabled={!input.trim() || isLoading || !isConnected}
                 className={clsx(
                   'btn-primary px-6',
-                  (!input.trim() || isLoading || !status.running) && 'opacity-50 cursor-not-allowed'
+                  (!input.trim() || isLoading || !isConnected) && 'opacity-50 cursor-not-allowed'
                 )}
               >
                 <PaperAirplaneIcon className="w-5 h-5" />
               </button>
             </div>
             
-            {!status.running && (
+            {!isConnected && (
               <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                 <div className="flex items-center">
                   <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600 mr-2" />
                   <span className="text-sm text-yellow-800">
-                    The gateway is offline. Start it from the Gateway page to enable chat.
+                    WebSocket is offline. Connect to the gateway to enable chat.
                   </span>
                 </div>
               </div>
@@ -358,11 +363,11 @@ const Chat = () => {
                 <div className="text-sm font-medium text-gray-700">Connection</div>
                 <div className={clsx(
                   'mt-1 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                  status.running 
+                  isConnected 
                     ? 'bg-green-100 text-green-800' 
                     : 'bg-red-100 text-red-800'
                 )}>
-                  {status.running ? 'Connected' : 'Disconnected'}
+                  {isConnected ? 'Connected' : 'Disconnected'}
                 </div>
               </div>
             </div>
