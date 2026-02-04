@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAgents } from '../hooks/useAgents';
+import { useOpenClawWebSocket } from '../hooks/useOpenClawWebSocket';
 import { useChat } from '../contexts/ChatContext';
 import {
   PlusIcon,
@@ -12,9 +12,20 @@ import {
 import { clsx } from 'clsx';
 
 const Agents = () => {
-  const { loading, error, agents, sessions, refresh, spawn, addAgent, pauseSession } = useAgents();
+  const { 
+    isConnected, 
+    agents: wsAgents, 
+    spawnAgent: wsSpawnAgent, 
+    getAgents,
+    error: wsError 
+  } = useOpenClawWebSocket();
   const navigate = useNavigate();
   const { addMessage, ensureAgentTab, registerLocalSession, localSessions } = useChat();
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [agents, setAgents] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
 
   const [newTask, setNewTask] = useState('');
   const [newAgentId, setNewAgentId] = useState('');
@@ -28,22 +39,32 @@ const Agents = () => {
   const [isAddingAgent, setIsAddingAgent] = useState(false);
   const [addAgentError, setAddAgentError] = useState<string | null>(null);
 
+  // Sync agents from WebSocket
+  useEffect(() => {
+    if (wsAgents && wsAgents.length > 0) {
+      const formattedAgents = wsAgents.map(agent => ({
+        id: agent.id,
+        name: agent.name,
+        emoji: '🤖',
+        model: 'default',
+        workspace: '/home/jakjak04/Desktop/claw_workspace',
+        isDefault: agent.id === 'main',
+      }));
+      setAgents(formattedAgents);
+    }
+  }, [wsAgents]);
+
+  // Load agents on mount and when connected
+  useEffect(() => {
+    if (isConnected) {
+      refresh();
+    }
+  }, [isConnected]);
+
   const activeSessions = useMemo(() => {
     const now = Date.now();
-    const remote = [...sessions]
-      .filter(s => now - s.updatedAt <= 10 * 60 * 1000)
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map(s => ({
-        key: s.key,
-        updatedAt: s.updatedAt,
-        model: s.model,
-        totalTokens: s.totalTokens,
-        inputTokens: s.inputTokens,
-        outputTokens: s.outputTokens,
-        source: 'openclaw' as const,
-        agentId: s.key?.split(':')[1] || 'unknown',
-      }));
-
+    
+    // Use local sessions only for now (WebSocket sessions not implemented yet)
     const local = localSessions
       .filter(s => now - s.startedAt <= 10 * 60 * 1000)
       .map(s => ({
@@ -57,18 +78,50 @@ const Agents = () => {
         agentId: s.agentId,
       }));
 
-    const combined = [...local, ...remote];
+    const combined = [...local];
     const seen = new Set<string>();
     return combined.filter(s => {
       if (seen.has(s.key)) return false;
       seen.add(s.key);
       return true;
     }).sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [sessions, localSessions]);
+  }, [localSessions]);
+
+  const refresh = async () => {
+    if (!isConnected) {
+      setError('Not connected to WebSocket');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const agentList = await getAgents();
+      const formattedAgents = agentList.map(agent => ({
+        id: agent.id,
+        name: agent.name,
+        emoji: '🤖',
+        model: 'default',
+        workspace: '/home/jakjak04/Desktop/claw_workspace',
+        isDefault: agent.id === 'main',
+      }));
+      setAgents(formattedAgents);
+    } catch (err: any) {
+      setError(err.message || 'Failed to refresh agents');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSpawnAgent = async () => {
     if (!newTask.trim()) {
       setSpawnError('Please enter a task for the agent');
+      return;
+    }
+
+    if (!isConnected) {
+      setSpawnError('Not connected to WebSocket');
       return;
     }
 
@@ -81,15 +134,16 @@ const Agents = () => {
     setSpawnError(null);
 
     const targetId = newAgentId || 'main';
+    const taskText = newTask.trim();
+    
     ensureAgentTab(targetId);
     addMessage(targetId, {
       id: `${Date.now()}-task`,
-      text: `Task assigned: ${newTask.trim()}`,
+      text: `Task assigned via WebSocket: ${taskText}`,
       sender: 'user',
       timestamp: new Date().toISOString(),
     });
 
-    const taskText = newTask.trim();
     const sessionKey = `agent:${targetId}:main`;
     registerLocalSession({
       key: sessionKey,
@@ -102,18 +156,22 @@ const Agents = () => {
     setNewTask('');
     setIsSpawning(false);
 
-    spawn(taskText, targetId, thinking)
-      .then((response) => {
-        addMessage(targetId, {
-          id: `${Date.now()}-plan`,
-          text: response,
-          sender: 'assistant',
-          timestamp: new Date().toISOString(),
-        });
-      })
-      .catch((err: any) => {
-        setSpawnError(err.message || 'Failed to spawn agent');
+    try {
+      // Use WebSocket to spawn agent
+      const agentId = await wsSpawnAgent(taskText, `Agent-${Date.now()}`);
+      
+      addMessage(targetId, {
+        id: `${Date.now()}-plan`,
+        text: `Agent spawned via WebSocket with ID: ${agentId}. Task: ${taskText}`,
+        sender: 'assistant',
+        timestamp: new Date().toISOString(),
       });
+
+      // Refresh agents list
+      await refresh();
+    } catch (err: any) {
+      setSpawnError(err.message || 'Failed to spawn agent via WebSocket');
+    }
   };
 
   const handleAddAgent = async () => {
@@ -126,7 +184,9 @@ const Agents = () => {
     setAddAgentError(null);
 
     try {
-      await addAgent(agentName.trim(), agentWorkspace.trim(), agentModel.trim() || undefined);
+      // Note: Adding agents via WebSocket is not currently supported
+      // This would require a new WebSocket method or using CLI
+      setAddAgentError('Adding agents via WebSocket is not yet supported. Use CLI instead.');
       setAgentName('');
       setAgentModel('');
     } catch (err: any) {
@@ -159,17 +219,37 @@ const Agents = () => {
           <h1 className="text-2xl font-bold text-gray-900">Agents</h1>
           <p className="text-gray-600">Create and monitor OpenClaw agent sessions</p>
         </div>
-        <button onClick={refresh} className="btn-secondary">
-          <ArrowPathIcon className={clsx('w-4 h-4 mr-2', loading && 'animate-spin')} />
-          Refresh
-        </button>
+        <div className="flex items-center space-x-4">
+          <div className={clsx(
+            'flex items-center px-3 py-1 rounded-full text-sm font-medium',
+            isConnected 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-red-100 text-red-800'
+          )}>
+            {isConnected ? (
+              <>
+                <CheckCircleIcon className="w-4 h-4 mr-1" />
+                WebSocket Connected
+              </>
+            ) : (
+              <>
+                <ExclamationTriangleIcon className="w-4 h-4 mr-1" />
+                WebSocket Offline
+              </>
+            )}
+          </div>
+          <button onClick={refresh} className="btn-secondary" disabled={!isConnected}>
+            <ArrowPathIcon className={clsx('w-4 h-4 mr-2', loading && 'animate-spin')} />
+            Refresh
+          </button>
+        </div>
       </div>
 
-      {error && (
+      {(error || wsError) && (
         <div className="p-4 bg-red-50 rounded-lg border border-red-200">
           <div className="flex items-center">
             <ExclamationTriangleIcon className="w-5 h-5 text-red-600 mr-2" />
-            <span className="text-sm text-red-800">{error}</span>
+            <span className="text-sm text-red-800">{error || wsError}</span>
           </div>
         </div>
       )}
@@ -220,7 +300,7 @@ const Agents = () => {
               )}
 
               <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-500">Spawns via OpenClaw CLI (local)</div>
+                <div className="text-sm text-gray-500">Spawns via WebSocket (real-time)</div>
                 <button
                   onClick={handleSpawnAgent}
                   disabled={isSpawning || !newTask.trim()}
@@ -266,8 +346,9 @@ const Agents = () => {
                     </div>
                     <div className="mt-3 flex items-center gap-2">
                       <button
-                        className="btn-secondary text-xs"
-                        onClick={() => pauseSession(s.key, 'pause')}
+                        className="btn-secondary text-xs opacity-50 cursor-not-allowed"
+                        onClick={() => setError('Pausing sessions via WebSocket is not yet supported.')}
+                        title="Pausing sessions via WebSocket is not yet supported"
                       >
                         <PauseIcon className="w-4 h-4 mr-1" />
                         Pause
@@ -340,9 +421,10 @@ const Agents = () => {
           <div className="card p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Tips</h2>
             <ul className="text-sm text-gray-600 space-y-2">
-              <li>• Agent IDs must exist in OpenClaw config</li>
+              <li>• Uses WebSocket connection to gateway (port 8080)</li>
               <li>• Sessions show only activity in last 10 minutes</li>
-              <li>• Pause sends a "pause" instruction to the session</li>
+              <li>• Real-time agent spawning via WebSocket</li>
+              <li>• Adding agents requires CLI (WebSocket not yet supported)</li>
             </ul>
           </div>
         </div>

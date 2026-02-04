@@ -48,7 +48,7 @@ class OpenClawWebSocket {
   private socket: Socket | null = null;
   private eventListeners: Map<keyof WebSocketEventMap, Function[]> = new Map();
   private isConnected: boolean = false;
-  private gatewayUrl: string = 'http://localhost:18789';
+  private gatewayUrl: string = 'http://localhost:8080';
   private apiKey: string = '';
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
