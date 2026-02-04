@@ -17,7 +17,7 @@ const Settings = () => {
   const [autoStart, setAutoStart] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [minimizeToTray, setMinimizeToTray] = useState(true);
-  const [gatewayPort, setGatewayPort] = useState('8080');
+  const [gatewayPort, setGatewayPort] = useState('18789');
   const [apiKey, setApiKey] = useState('');
   const [logRetention, setLogRetention] = useState('7');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');

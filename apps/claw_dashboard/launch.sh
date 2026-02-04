@@ -28,7 +28,10 @@ echo "   - Press Ctrl+Shift+I in app for DevTools"
 echo "   - Check console for errors"
 echo "   - Or access web version: http://localhost:3000"
 
-# Run the combined dev command
-export PATH="$PATH:/home/jakjak04/.local/share/pnpm"
-export OPENCLAW_BIN="/home/jakjak04/.local/share/pnpm/openclaw"
+export PATH="$PATH:$HOME/.local/share/pnpm"
+export OPENCLAW_BIN="$HOME/.local/share/pnpm/openclaw"
+
+echo "🔨 Building Main Process..."
+npm run build:main
+
 NODE_ENV=development npm run dev:all

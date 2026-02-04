@@ -50,7 +50,7 @@ const createWindow = () => {
             <p>URL: ${startUrl}</p>
             <p>Make sure the development server is running:</p>
             <pre style="background: #f0f0f0; padding: 10px; border-radius: 4px;">
-              cd /home/jakjak04/Desktop/claw_workspace/claw-dashboard
+              cd ${__dirname}/../
               npm run dev:renderer
             </pre>
             <p>Then reload this window (Ctrl+R)</p>

@@ -13,11 +13,12 @@ A polished desktop application for managing OpenClaw gateway and communicating w
 
 ## Screenshots
 
-*(Screenshots will be added after building)*
+_(Screenshots will be added after building)_
 
 ## 🚀 Quick Start
 
 ### **Method 1: One-Click Desktop Launcher**
+
 ```bash
 # Install desktop shortcut (first time only):
 ./install.sh
@@ -27,6 +28,7 @@ A polished desktop application for managing OpenClaw gateway and communicating w
 ```
 
 ### **Method 2: Terminal Launcher**
+
 ```bash
 # Run the launcher script:
 ./launch.sh
@@ -38,6 +40,7 @@ A polished desktop application for managing OpenClaw gateway and communicating w
 ```
 
 ### **Method 3: Manual Development**
+
 ```bash
 # Install dependencies (first time only):
 npm install
@@ -53,12 +56,14 @@ npm run electron-dev  # Electron app (separate terminal)
 ## 🛠️ Troubleshooting
 
 ### **If you get dependency warnings:**
+
 ```bash
 # Install missing dependencies:
 npm install react-router-dom
 ```
 
 ### **If the build fails:**
+
 ```bash
 # Try a clean install:
 rm -rf node_modules package-lock.json
@@ -66,6 +71,7 @@ npm install
 ```
 
 ### **For immediate testing:**
+
 ```bash
 # The simplest working method:
 cd /home/jakjak04/Desktop/claw_workspace/claw-dashboard
@@ -74,6 +80,7 @@ npm run dev
 ```
 
 ## 🎯 One-Line Setup
+
 ```bash
 cd /home/jakjak04/Desktop/claw_workspace/claw-dashboard && npm install && npm run dev
 ```
@@ -138,6 +145,7 @@ claw-dashboard/
 ### Gateway Integration
 
 The app communicates with the OpenClaw gateway through:
+
 - IPC calls to the main process
 - Main process executes shell commands (`openclaw gateway ...`)
 - Real-time status polling and log monitoring
@@ -145,6 +153,7 @@ The app communicates with the OpenClaw gateway through:
 ## API Integration (Planned)
 
 Future versions will include:
+
 - Direct REST API communication with gateway
 - WebSocket for real-time updates
 - Authentication and secure API keys
@@ -153,22 +162,26 @@ Future versions will include:
 ## Building and Packaging
 
 ### Development Build
+
 ```bash
 npm run dev
 ```
 
 ### Production Build
+
 ```bash
 npm run build
 npm run electron
 ```
 
 ### Package for Distribution
+
 ```bash
 npm run package
 ```
 
 Supported platforms:
+
 - **Windows**: NSIS installer
 - **macOS**: DMG package
 - **Linux**: AppImage
@@ -181,13 +194,14 @@ Create a `.env` file in the root directory:
 
 ```env
 VITE_GATEWAY_HOST=localhost
-VITE_GATEWAY_PORT=8080
+VITE_GATEWAY_PORT=18789
 VITE_API_KEY=your_api_key_here
 ```
 
 ### Settings
 
 The application settings are stored in:
+
 - **Electron**: `app.getPath('userData')/config.json`
 - **React**: Local state with persistence to local storage
 

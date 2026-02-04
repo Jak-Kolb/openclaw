@@ -48,8 +48,9 @@ class OpenClawWebSocket {
   private socket: Socket | null = null;
   private eventListeners: Map<keyof WebSocketEventMap, Function[]> = new Map();
   private isConnected: boolean = false;
-  private gatewayUrl: string = 'http://localhost:8080';
+  private gatewayUrl: string = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:18789';
   private apiKey: string = '';
+  // private apiKey: string = import.meta.env.VITE_API_KEY || ''; // Optional API key for auth
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
   private reconnectDelay: number = 1000; // Start with 1 second

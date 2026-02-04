@@ -421,7 +421,7 @@ const Agents = () => {
           <div className="card p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Tips</h2>
             <ul className="text-sm text-gray-600 space-y-2">
-              <li>• Uses WebSocket connection to gateway (port 8080)</li>
+              <li>• Uses WebSocket connection to gateway (port 18789)</li>
               <li>• Sessions show only activity in last 10 minutes</li>
               <li>• Real-time agent spawning via WebSocket</li>
               <li>• Adding agents requires CLI (WebSocket not yet supported)</li>

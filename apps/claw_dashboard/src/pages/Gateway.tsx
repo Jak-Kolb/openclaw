@@ -51,7 +51,7 @@ const Gateway = () => {
     { label: 'PID', value: 'N/A', type: 'info' },
     { label: 'Uptime', value: 'N/A', type: 'info' },
     { label: 'Memory', value: 'N/A', type: 'info' },
-    { label: 'Port', value: '8080', type: 'info' },
+    { label: 'Port', value: '18789', type: 'info' },
     { label: 'Host', value: 'localhost', type: 'info' },
   ];
 
@@ -269,7 +269,7 @@ const Gateway = () => {
                     <li>• The gateway must be running to communicate with Jarvis</li>
                     <li>• Restarting the gateway reloads configuration changes</li>
                     <li>• Check logs for debugging if the gateway fails to start</li>
-                    <li>• Default port is 8080 - ensure it's not blocked by firewall</li>
+                    <li>• Default port is 18789 - ensure it's not blocked by firewall</li>
                   </ul>
                 </div>
               </div>
