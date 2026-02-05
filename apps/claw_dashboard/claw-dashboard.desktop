@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Claw Dashboard
+Comment=OpenClaw Gateway Management Dashboard
+Exec=/home/jakjak04/Desktop/claw_workspace/openclaw/apps/claw_dashboard/launch.sh
+Icon=/home/jakjak04/Desktop/claw_workspace/openclaw/apps/claw_dashboard/electron/assets/icon.png
+Terminal=false
+Categories=Development;Utility;
+StartupNotify=true
+Keywords=openclaw;gateway;ai;assistant;dashboard
